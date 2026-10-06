@@ -1,6 +1,6 @@
 import express from "express";
 import cors from "cors";
-import helmet from "helmet";
+import * as helmet from "helmet";
 import cookieParser from "cookie-parser";
 import { rateLimit } from "express-rate-limit";
 import { config, isProduction } from "./config/index.js";
@@ -18,7 +18,7 @@ if (isProduction) {
 app.disable("x-powered-by");
 
 // Security headers
-app.use(helmet());
+app.use(helmet.default());
 
 // CORS — allow the frontend origin(s), credentials for cookie-based auth
 const allowedOrigins = process.env.FRONTEND_URL?.split(",")
@@ -32,6 +32,7 @@ app.use(
 );
 
 // Body parsers + cookies
+// Keep Stripe's webhook body raw so its signature can be verified exactly as sent.
 app.use(
   "/api/v1/payments/webhook",
   express.raw({ type: "application/json", limit: "1mb" }),
