@@ -1,6 +1,20 @@
 import express from "express";
 import cors from "cors";
-import { default as helmet } from "helmet";
+import {
+  contentSecurityPolicy,
+  crossOriginOpenerPolicy,
+  crossOriginResourcePolicy,
+  originAgentCluster,
+  referrerPolicy,
+  strictTransportSecurity,
+  xContentTypeOptions,
+  xDnsPrefetchControl,
+  xDownloadOptions,
+  xFrameOptions,
+  xPermittedCrossDomainPolicies,
+  xPoweredBy,
+  xXssProtection,
+} from "helmet";
 import cookieParser from "cookie-parser";
 import { rateLimit } from "express-rate-limit";
 import { config, isProduction } from "./config/index.js";
@@ -18,7 +32,21 @@ if (isProduction) {
 app.disable("x-powered-by");
 
 // Security headers
-app.use(helmet());
+app.use(
+  contentSecurityPolicy(),
+  crossOriginOpenerPolicy(),
+  crossOriginResourcePolicy(),
+  originAgentCluster(),
+  referrerPolicy(),
+  strictTransportSecurity(),
+  xContentTypeOptions(),
+  xDnsPrefetchControl(),
+  xDownloadOptions(),
+  xFrameOptions(),
+  xPermittedCrossDomainPolicies(),
+  xPoweredBy(),
+  xXssProtection(),
+);
 
 // CORS — allow the frontend origin(s), credentials for cookie-based auth
 const allowedOrigins = process.env.FRONTEND_URL?.split(",")
