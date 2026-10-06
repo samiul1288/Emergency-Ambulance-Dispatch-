@@ -1,0 +1,240 @@
+datasource db {
+  provider = "postgresql"
+}
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+// ==========================================
+// ENUMS
+// ==========================================
+
+enum UserRole {
+  PATIENT
+  DRIVER
+  ADMIN
+}
+
+enum AmbulanceType {
+  BASIC
+  ICU
+  FREEZER
+}
+
+enum RequestPriority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum DispatchStatus {
+  PENDING
+  DISPATCHED
+  EN_ROUTE
+  PICKED_UP
+  COMPLETED
+  CANCELLED
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  FAILED
+}
+
+// ==========================================
+// MODELS
+// ==========================================
+
+model User {
+  id               String    @id @default(uuid())
+  email            String    @unique
+  password         String
+  firstName        String
+  lastName         String
+  phone            String    @unique
+  role             UserRole  @default(PATIENT)
+  isActive         Boolean   @default(true)
+  refreshTokenHash String?
+  isDeleted        Boolean   @default(false)
+  deletedAt        DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  // Relationships
+  driverProfile    DriverProfile?
+  dispatchRequests DispatchRequest[] @relation("PatientDispatchRequests")
+  reviewsGiven     Review[]          @relation("UserGivenReviews")
+  auditLogs        AuditLog[]
+
+  @@index([role])
+  @@index([isDeleted])
+  @@index([createdAt])
+  @@map("users")
+}
+
+model DriverProfile {
+  id               String    @id @default(uuid())
+  userId           String    @unique
+  licenseNumber    String    @unique
+  isAvailable      Boolean   @default(true)
+  currentLatitude  Float?
+  currentLongitude Float?
+  isDeleted        Boolean   @default(false)
+  deletedAt        DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  // Relationships
+  user             User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  ambulance        Ambulance?
+  dispatchRequests DispatchRequest[] @relation("DriverDispatchRequests")
+  reviewsReceived  Review[]          @relation("DriverReceivedReviews")
+
+  @@index([isAvailable])
+  @@index([isDeleted])
+  @@index([currentLatitude, currentLongitude])
+  @@map("driver_profiles")
+}
+
+model Ambulance {
+  id            String        @id @default(uuid())
+  vehicleNumber String        @unique
+  type          AmbulanceType @default(BASIC)
+  driverId      String?       @unique
+  isActive      Boolean       @default(true)
+  isDeleted     Boolean       @default(false)
+  deletedAt     DateTime?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  // Relationships
+  driver           DriverProfile?    @relation(fields: [driverId], references: [id], onDelete: SetNull)
+  dispatchRequests DispatchRequest[]
+
+  @@index([type])
+  @@index([isActive])
+  @@index([isDeleted])
+  @@map("ambulances")
+}
+
+model DispatchRequest {
+  id                   String          @id @default(uuid())
+  patientId            String
+  driverId             String?
+  ambulanceId          String?
+  status               DispatchStatus  @default(PENDING)
+  priority             RequestPriority @default(MEDIUM)
+  requiredAmbulanceType AmbulanceType?
+  pickupAddress      String
+  pickupLatitude     Float
+  pickupLongitude    Float
+  dropoffAddress     String?
+  dropoffLatitude    Float?
+  dropoffLongitude   Float?
+  emergencyDetails   String?
+  estimatedArrival   DateTime?
+  dispatchedAt       DateTime?
+  enRouteAt          DateTime?
+  pickedUpAt         DateTime?
+  completedAt        DateTime?
+  cancelledAt        DateTime?
+  cancellationReason String?
+  isDeleted          Boolean         @default(false)
+  deletedAt          DateTime?
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+
+  // Relationships
+  patient   User           @relation("PatientDispatchRequests", fields: [patientId], references: [id], onDelete: Restrict)
+  driver    DriverProfile? @relation("DriverDispatchRequests", fields: [driverId], references: [id], onDelete: SetNull)
+  ambulance Ambulance?     @relation(fields: [ambulanceId], references: [id], onDelete: SetNull)
+  payment   Payment?
+  review    Review?
+
+  @@index([patientId])
+  @@index([driverId])
+  @@index([ambulanceId])
+  @@index([status])
+  @@index([priority])
+  @@index([isDeleted])
+  @@index([createdAt])
+  @@map("dispatch_requests")
+}
+
+model Payment {
+  id                String        @id @default(uuid())
+  dispatchRequestId String        @unique
+  amount            Decimal       @db.Decimal(10, 2)
+  currency          String        @default("USD")
+  status            PaymentStatus @default(PENDING)
+  paymentMethod     String?
+  transactionId     String?       @unique
+  paidAt            DateTime?
+  failedAt          DateTime?
+  failureReason     String?
+  isDeleted         Boolean       @default(false)
+  deletedAt         DateTime?
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  // Relationships
+  dispatchRequest DispatchRequest @relation(fields: [dispatchRequestId], references: [id], onDelete: Cascade)
+
+  @@index([status])
+  @@index([isDeleted])
+  @@index([createdAt])
+  @@map("payments")
+}
+
+model AuditLog {
+  id        String    @id @default(uuid())
+  userId    String?
+  action    String
+  entity    String
+  entityId  String?
+  details   Json?
+  ipAddress String?
+  userAgent String?
+  isDeleted Boolean   @default(false)
+  deletedAt DateTime?
+  createdAt DateTime  @default(now())
+
+  // Relationships
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([action])
+  @@index([entity, entityId])
+  @@index([isDeleted])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+model Review {
+  id                String    @id @default(uuid())
+  dispatchRequestId String    @unique
+  patientId         String
+  driverId          String
+  rating            Int
+  feedback          String?
+  isDeleted         Boolean   @default(false)
+  deletedAt         DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  // Relationships
+  dispatchRequest DispatchRequest @relation(fields: [dispatchRequestId], references: [id], onDelete: Cascade)
+  patient         User            @relation("UserGivenReviews", fields: [patientId], references: [id], onDelete: Restrict)
+  driver          DriverProfile   @relation("DriverReceivedReviews", fields: [driverId], references: [id], onDelete: Restrict)
+
+  @@index([patientId])
+  @@index([driverId])
+  @@index([rating])
+  @@index([isDeleted])
+  @@index([createdAt])
+  @@map("reviews")
+}
