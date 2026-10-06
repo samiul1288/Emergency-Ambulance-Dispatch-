@@ -23,6 +23,7 @@ export async function listUsers(query: AdminUsersQuery) {
   };
   const orderBy = { [query.sortBy]: query.sortOrder };
 
+  // Fetch the total and current page together so pagination metadata accompanies the results.
   const [total, users] = await prisma.$transaction([
     prisma.user.count({ where }),
     prisma.user.findMany({
@@ -111,6 +112,7 @@ export async function updateUserRole(
 }
 
 export async function getDashboardStats() {
+  // Keep revenue grouped by currency; amounts in different currencies cannot be added together.
   const [totalDispatches, revenueByCurrency, activeDrivers, totalPatients] =
     await prisma.$transaction([
       prisma.dispatchRequest.count({ where: { isDeleted: false } }),

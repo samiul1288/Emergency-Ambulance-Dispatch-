@@ -101,6 +101,7 @@ export async function initiateCheckout(
       ],
     );
   }
+  // The configured server-side fare is authoritative; clients cannot choose the charge.
   if (!config.DISPATCH_FARE_AMOUNT) {
     throw new ApiError(503, "Dispatch fare is not configured");
   }
@@ -156,6 +157,7 @@ export async function initiateCheckout(
     mode: "payment",
     customer_email: dispatch.patient.email,
     client_reference_id: payment.id,
+    // Stripe returns these IDs in webhook events so they can be matched to this database payment.
     metadata: { paymentId: payment.id, dispatchRequestId: dispatch.id },
     payment_intent_data: {
       metadata: { paymentId: payment.id, dispatchRequestId: dispatch.id },
@@ -263,6 +265,7 @@ export async function handleStripeEvent(event: Stripe.Event): Promise<void> {
     if (
       eventAmount !== null &&
       eventAmount !== undefined &&
+      // Ignore events whose amount or currency does not match the stored checkout.
       (eventAmount !==
         Math.round(
           Number(payment.amount) * currencyMinorUnitFactor(payment.currency),

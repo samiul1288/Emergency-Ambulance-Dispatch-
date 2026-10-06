@@ -58,6 +58,7 @@ export async function createDispatchRequest(
 ) {
   await requirePatient(userId);
 
+  // A patient must finish or cancel an existing emergency before opening another.
   const outstanding = await prisma.dispatchRequest.findFirst({
     where: {
       patientId: userId,
@@ -549,11 +550,13 @@ export async function assignDriver(
             longitude: driver.currentLongitude,
           },
         );
+  // Use a conservative default ETA until the driver has submitted a GPS location.
   const etaMinutes =
     distanceKm === null
       ? DEFAULT_ETA_MINUTES
       : Math.max(1, Math.round((distanceKm / AVERAGE_SPEED_KMPH) * 60));
 
+  // Reserve the driver and assign the request together so neither update is left half-applied.
   return prisma.$transaction(async (tx) => {
     await tx.driverProfile.update({
       where: { id: driver.id },
@@ -692,6 +695,7 @@ export async function updateDispatchStatus(
   const releaseDriverId =
     target === "COMPLETED" || target === "CANCELLED" ? dispatch.driverId : null;
 
+  // Finalizing a trip also returns its driver to the available pool atomically.
   return prisma.$transaction(async (tx) => {
     if (releaseDriverId !== null) {
       await tx.driverProfile.update({
